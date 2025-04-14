@@ -9,15 +9,9 @@ export default function SignIn() {
     // Store the state in sessionStorage for verification later
     sessionStorage.setItem('oauth_state', state);
 
-    // Define all required scopes
+    // Define only the allowed scopes for this client
     const scopes = [
-      'offline_access',
-      'setup.read',
-      'setup.write',
-      'reservation.read',
-      'reservation.write',
-      'folio.read',
-      'folio.write'
+      'setup.read'
     ].join(' ');
 
     // Construct the apaleo authorization URL
