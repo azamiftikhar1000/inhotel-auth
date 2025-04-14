@@ -27,8 +27,9 @@ export const authOptions: NextAuthOptions = {
       authorization: {
         url: "https://identity.apaleo.com/connect/authorize",
         params: {
-          scope: "setup.read offline_access",
+          scope: "offline_access setup.read",
           response_type: "code",
+          redirect_uri: "https://inhotel-auth-4fbefd0bd04c.herokuapp.com/api/auth/callback/apaleo",
         },
       },
       token: {
@@ -39,22 +40,23 @@ export const authOptions: NextAuthOptions = {
             method: "POST",
             headers: {
               "Content-Type": "application/x-www-form-urlencoded",
+              Accept: "application/json",
             },
             body: new URLSearchParams({
               grant_type: "authorization_code",
               client_id: client.clientId as string,
               client_secret: client.clientSecret as string,
               code: params.code as string,
-              redirect_uri: `${process.env.NEXTAUTH_URL}/api/auth/callback/apaleo`,
+              redirect_uri: "https://inhotel-auth-4fbefd0bd04c.herokuapp.com/api/auth/callback/apaleo",
             }).toString(),
           });
 
-          const tokens: ApaleoTokens = await response.json();
+          const tokens = await response.json();
           console.log("Token response:", tokens);
           
           if (!response.ok) {
             console.error("Token error:", tokens);
-            throw new Error("Failed to get access token");
+            throw new Error(tokens.error || "Failed to get access token");
           }
 
           return {
@@ -68,38 +70,38 @@ export const authOptions: NextAuthOptions = {
         },
       },
       userinfo: {
-        url: "https://app.apaleo.com/api/account/v1/accounts/current",
+        url: "https://api.apaleo.com/accounts/v1/accounts/current",
         async request({ tokens }) {
           console.log("Userinfo request with token:", tokens.access_token);
           const response = await fetch(
-            "https://app.apaleo.com/api/account/v1/accounts/current",
+            "https://api.apaleo.com/accounts/v1/accounts/current",
             {
               headers: {
                 Authorization: `Bearer ${tokens.access_token}`,
+                Accept: "application/json",
               },
             }
           );
           
           if (!response.ok) {
-            console.error("Userinfo error:", await response.text());
+            const errorText = await response.text();
+            console.error("Userinfo error:", errorText);
             throw new Error("Failed to get user info");
           }
 
-          return response.json();
+          const profile = await response.json();
+          console.log("Profile response:", profile);
+          return profile;
         },
       },
-      profile(profile: ApaleoProfile, tokens: any) {
+      profile(profile, tokens) {
         console.log("Profile data:", profile, "Tokens:", tokens);
-        const expiresAt = Math.floor(Date.now() / 1000 + (tokens.expires_in as number));
-        
         return {
           id: profile.id,
           name: profile.name || "Apaleo User",
           email: profile.email,
-          accessToken: tokens.access_token,
-          refreshToken: tokens.refresh_token,
-          expiresAt,
-        } as User;
+          image: null,
+        };
       },
     },
   ],
@@ -110,7 +112,7 @@ export const authOptions: NextAuthOptions = {
           ...token,
           accessToken: account.access_token,
           refreshToken: account.refresh_token,
-          expiresAt: account.expires_at,
+          expiresAt: Math.floor(Date.now() / 1000 + (account.expires_in as number)),
           user,
         };
       }
@@ -124,7 +126,10 @@ export const authOptions: NextAuthOptions = {
       try {
         const response = await fetch("https://identity.apaleo.com/connect/token", {
           method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            Accept: "application/json",
+          },
           body: new URLSearchParams({
             grant_type: "refresh_token",
             client_id: process.env.APALEO_CLIENT_ID as string,
@@ -133,7 +138,7 @@ export const authOptions: NextAuthOptions = {
           }).toString(),
         });
 
-        const tokens: ApaleoTokens = await response.json();
+        const tokens = await response.json();
         console.log("Token refresh response:", tokens);
 
         if (!response.ok) throw tokens;
@@ -150,12 +155,14 @@ export const authOptions: NextAuthOptions = {
       }
     },
     async session({ session, token }) {
-      console.log("Session callback:", { session, token });
       return {
         ...session,
         accessToken: token.accessToken,
         error: token.error,
-        user: token.user as User,
+        user: {
+          ...session.user,
+          id: token.sub,
+        },
       };
     },
   },
