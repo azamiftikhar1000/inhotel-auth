@@ -1,7 +1,6 @@
 import NextAuth, { NextAuthOptions } from "next-auth";
 import type { User } from "next-auth";
 import type { JWT } from "next-auth/jwt";
-import type { OAuthConfig, OAuthUserConfig } from "next-auth/providers";
 
 interface ApaleoProfile {
   id: string;
@@ -9,19 +8,15 @@ interface ApaleoProfile {
   email?: string;
 }
 
+interface ApaleoTokens {
+  access_token: string;
+  refresh_token?: string;
+  expires_in: number;
+  token_type: string;
+}
+
 export const authOptions: NextAuthOptions = {
   debug: true,
-  logger: {
-    error(code, ...message) {
-      console.error(code, message);
-    },
-    warn(code, ...message) {
-      console.warn(code, message);
-    },
-    debug(code, ...message) {
-      console.log(code, message);
-    },
-  },
   providers: [
     {
       id: "apaleo",
@@ -47,24 +42,28 @@ export const authOptions: NextAuthOptions = {
             },
             body: new URLSearchParams({
               grant_type: "authorization_code",
-              client_id: client.clientId,
-              client_secret: client.clientSecret,
+              client_id: client.clientId as string,
+              client_secret: client.clientSecret as string,
               code: params.code as string,
               redirect_uri: `${process.env.NEXTAUTH_URL}/api/auth/callback/apaleo`,
-            }),
+            }).toString(),
           });
 
-          const tokens = await response.json();
+          const tokens: ApaleoTokens = await response.json();
           console.log("Token response:", tokens);
           
           if (!response.ok) {
             console.error("Token error:", tokens);
-            throw new Error(tokens.error);
+            throw new Error("Failed to get access token");
           }
 
           return {
-            ...tokens,
-            expires_at: Math.floor(Date.now() / 1000 + tokens.expires_in),
+            tokens: {
+              access_token: tokens.access_token,
+              refresh_token: tokens.refresh_token,
+              expires_in: tokens.expires_in,
+              token_type: tokens.token_type,
+            }
           };
         },
       },
@@ -89,19 +88,23 @@ export const authOptions: NextAuthOptions = {
           return response.json();
         },
       },
-      profile(profile: ApaleoProfile): User {
-        console.log("Profile data:", profile);
+      profile(profile: ApaleoProfile, tokens: any) {
+        console.log("Profile data:", profile, "Tokens:", tokens);
+        const expiresAt = Math.floor(Date.now() / 1000 + (tokens.expires_in as number));
+        
         return {
           id: profile.id,
           name: profile.name || "Apaleo User",
           email: profile.email,
-        };
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token,
+          expiresAt,
+        } as User;
       },
-    } as OAuthConfig<ApaleoProfile>,
+    },
   ],
   callbacks: {
-    async jwt({ token, account, user }) {
-      console.log("JWT callback:", { token, account, user });
+    async jwt({ token, user, account }) {
       if (account && user) {
         return {
           ...token,
@@ -127,10 +130,10 @@ export const authOptions: NextAuthOptions = {
             client_id: process.env.APALEO_CLIENT_ID as string,
             client_secret: process.env.APALEO_CLIENT_SECRET as string,
             refresh_token: token.refreshToken as string,
-          }),
+          }).toString(),
         });
 
-        const tokens = await response.json();
+        const tokens: ApaleoTokens = await response.json();
         console.log("Token refresh response:", tokens);
 
         if (!response.ok) throw tokens;
@@ -159,6 +162,7 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: "/auth/signin",
     error: "/auth/error",
+    signOut: "/auth/signout",
   },
   session: {
     strategy: "jwt",
