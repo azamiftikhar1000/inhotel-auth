@@ -5,21 +5,22 @@ import { useRouter } from 'next/router';
 
 export default function SignIn() {
   const router = useRouter();
-  const { error } = router.query;
+  const { error, error_description } = router.query;
 
   useEffect(() => {
     if (error) {
-      console.error('Authentication error:', error);
+      console.error('Authentication error:', { error, error_description });
       return;
     }
 
+    console.log('Starting Apaleo sign in...');
     signIn('apaleo', {
       callbackUrl: '/',
       redirect: true,
     }).catch((error) => {
       console.error('SignIn error:', error);
     });
-  }, [error]);
+  }, [error, error_description]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -30,13 +31,16 @@ export default function SignIn() {
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             {error
-              ? 'There was an error during authentication. Please try again.'
+              ? `Error: ${error}${error_description ? ` - ${error_description}` : ''}`
               : 'Please wait while we redirect you to the Apaleo login page.'}
           </p>
           {error && (
             <div className="mt-4 text-center">
               <button
-                onClick={() => signIn('apaleo', { callbackUrl: '/' })}
+                onClick={() => {
+                  console.log('Retrying authentication...');
+                  signIn('apaleo', { callbackUrl: '/' });
+                }}
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 Try Again

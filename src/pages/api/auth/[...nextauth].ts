@@ -11,6 +11,17 @@ interface ApaleoProfile {
 
 export const authOptions: NextAuthOptions = {
   debug: true,
+  logger: {
+    error(code, ...message) {
+      console.error(code, message);
+    },
+    warn(code, ...message) {
+      console.warn(code, message);
+    },
+    debug(code, ...message) {
+      console.log(code, message);
+    },
+  },
   providers: [
     {
       id: "apaleo",
@@ -27,13 +38,40 @@ export const authOptions: NextAuthOptions = {
       },
       token: {
         url: "https://identity.apaleo.com/connect/token",
-        params: {
-          grant_type: "authorization_code",
+        async request({ client, params }) {
+          console.log("Token request params:", params);
+          const response = await fetch("https://identity.apaleo.com/connect/token", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({
+              grant_type: "authorization_code",
+              client_id: client.clientId,
+              client_secret: client.clientSecret,
+              code: params.code as string,
+              redirect_uri: `${process.env.NEXTAUTH_URL}/api/auth/callback/apaleo`,
+            }),
+          });
+
+          const tokens = await response.json();
+          console.log("Token response:", tokens);
+          
+          if (!response.ok) {
+            console.error("Token error:", tokens);
+            throw new Error(tokens.error);
+          }
+
+          return {
+            ...tokens,
+            expires_at: Math.floor(Date.now() / 1000 + tokens.expires_in),
+          };
         },
       },
       userinfo: {
         url: "https://app.apaleo.com/api/account/v1/accounts/current",
-        async request({ tokens, client }) {
+        async request({ tokens }) {
+          console.log("Userinfo request with token:", tokens.access_token);
           const response = await fetch(
             "https://app.apaleo.com/api/account/v1/accounts/current",
             {
@@ -42,10 +80,17 @@ export const authOptions: NextAuthOptions = {
               },
             }
           );
-          return await response.json();
+          
+          if (!response.ok) {
+            console.error("Userinfo error:", await response.text());
+            throw new Error("Failed to get user info");
+          }
+
+          return response.json();
         },
       },
       profile(profile: ApaleoProfile): User {
+        console.log("Profile data:", profile);
         return {
           id: profile.id,
           name: profile.name || "Apaleo User",
@@ -56,6 +101,7 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async jwt({ token, account, user }) {
+      console.log("JWT callback:", { token, account, user });
       if (account && user) {
         return {
           ...token,
@@ -85,6 +131,7 @@ export const authOptions: NextAuthOptions = {
         });
 
         const tokens = await response.json();
+        console.log("Token refresh response:", tokens);
 
         if (!response.ok) throw tokens;
 
@@ -100,6 +147,7 @@ export const authOptions: NextAuthOptions = {
       }
     },
     async session({ session, token }) {
+      console.log("Session callback:", { session, token });
       return {
         ...session,
         accessToken: token.accessToken,
