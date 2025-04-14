@@ -4,36 +4,7 @@ import { GetServerSideProps } from 'next';
 
 export default function SignIn() {
   useEffect(() => {
-    // Generate a random state value for security
-    const state = Math.random().toString(36).substring(7);
-    // Store the state in sessionStorage for verification later
-    sessionStorage.setItem('oauth_state', state);
-
-    // Define only the allowed scopes for this client
-    const scopes = [
-      'setup.read',
-      'offline_access'
-    ].join(' ');
-
-    // Construct the apaleo authorization URL
-    const authUrl = `https://identity.apaleo.com/connect/authorize?` +
-      `response_type=code` +
-      `&scope=${encodeURIComponent(scopes)}` +
-      `&client_id=${process.env.NEXT_PUBLIC_APALEO_CLIENT_ID}` +
-      `&redirect_uri=${encodeURIComponent(process.env.NEXT_PUBLIC_APALEO_REDIRECT_URI || '')}` +
-      `&state=${state}`;
-
-    console.log('Redirecting to:', authUrl); // Add this for debugging
-    
-    // Add error handling for missing environment variables
-    if (!process.env.NEXT_PUBLIC_APALEO_CLIENT_ID || !process.env.NEXT_PUBLIC_APALEO_REDIRECT_URI) {
-      console.error('Missing required environment variables');
-      window.location.href = '/auth/error?error=configuration_error';
-      return;
-    }
-    
-    // Redirect to apaleo login
-    window.location.href = authUrl;
+    signIn('apaleo', { callbackUrl: '/' });
   }, []);
 
   return (

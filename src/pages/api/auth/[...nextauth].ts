@@ -1,112 +1,81 @@
-import NextAuth, { NextAuthOptions, User } from "next-auth";
-import CredentialsProvider from "next-auth/providers/credentials";
-import axios from "axios";
+import NextAuth, { NextAuthOptions } from "next-auth";
+import type { User } from "next-auth";
+import OAuth2Provider from "next-auth/providers/oauth";
 
 export const authOptions: NextAuthOptions = {
   providers: [
-    CredentialsProvider({
+    OAuth2Provider({
       id: "apaleo",
       name: "Apaleo",
-      credentials: {
-        code: { label: "Code", type: "text" },
+      type: "oauth",
+      clientId: process.env.APALEO_CLIENT_ID,
+      clientSecret: process.env.APALEO_CLIENT_SECRET,
+      wellKnown: "https://identity.apaleo.com/.well-known/openid-configuration",
+      authorization: {
+        params: {
+          scope: "setup.read identity offline_access",
+        },
       },
-      async authorize(credentials): Promise<User | null> {
-        if (!credentials?.code) return null;
-
-        try {
-          // Exchange the authorization code for an access token
-          const tokenResponse = await axios.post(
-            "https://identity.apaleo.com/connect/token",
-            new URLSearchParams({
-              client_id: process.env.APALEO_CLIENT_ID!,
-              client_secret: process.env.APALEO_CLIENT_SECRET!,
-              grant_type: "authorization_code",
-              code: credentials.code,
-              redirect_uri: process.env.APALEO_REDIRECT_URI!,
-            }),
-            {
-              headers: {
-                "Content-Type": "application/x-www-form-urlencoded",
-              },
-            }
-          );
-
-          const { access_token, refresh_token, expires_in } = tokenResponse.data;
-
-          // Get user info
-          const userResponse = await axios.get(
-            "https://app.apaleo.com/api/account/v1/accounts/current",
-            {
-              headers: {
-                Authorization: `Bearer ${access_token}`,
-              },
-            }
-          );
-
-          const user: User = {
-            id: userResponse.data.id || "user-id",
-            name: userResponse.data.name || "Apaleo User",
-            email: userResponse.data.email || "user@example.com",
-            accessToken: access_token,
-            refreshToken: refresh_token,
-            expiresAt: Math.floor(Date.now() / 1000) + expires_in,
-          };
-
-          return user;
-        } catch (error) {
-          console.error("Authentication error:", error);
-          return null;
-        }
+      token: "https://identity.apaleo.com/connect/token",
+      userinfo: "https://app.apaleo.com/api/account/v1/accounts/current",
+      profile(profile) {
+        return {
+          id: profile.id,
+          name: profile.name || "Apaleo User",
+          email: profile.email,
+        };
       },
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.accessToken = user.accessToken;
-        token.refreshToken = user.refreshToken;
-        token.expiresAt = user.expiresAt;
+    async jwt({ token, account, user }) {
+      if (account && user) {
+        return {
+          ...token,
+          accessToken: account.access_token,
+          refreshToken: account.refresh_token,
+          expiresAt: account.expires_at,
+          user,
+        };
       }
 
-      // Check if token is expired and refresh if needed
-      if (token.expiresAt && Date.now() / 1000 > token.expiresAt) {
-        try {
-          const refreshResponse = await axios.post(
-            "https://identity.apaleo.com/connect/token",
-            new URLSearchParams({
-              client_id: process.env.APALEO_CLIENT_ID!,
-              client_secret: process.env.APALEO_CLIENT_SECRET!,
-              grant_type: "refresh_token",
-              refresh_token: token.refreshToken as string,
-            }),
-            {
-              headers: {
-                "Content-Type": "application/x-www-form-urlencoded",
-              },
-            }
-          );
-
-          const {
-            access_token,
-            refresh_token,
-            expires_in,
-          } = refreshResponse.data;
-
-          token.accessToken = access_token;
-          token.refreshToken = refresh_token || token.refreshToken;
-          token.expiresAt = Math.floor(Date.now() / 1000) + expires_in;
-        } catch (error) {
-          console.error("Token refresh error:", error);
-          return { ...token, error: "RefreshAccessTokenError" };
-        }
+      // Return previous token if the access token has not expired yet
+      if (Date.now() < (token.expiresAt as number) * 1000) {
+        return token;
       }
-      return token;
+
+      // Access token has expired, try to update it
+      try {
+        const response = await fetch("https://identity.apaleo.com/connect/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            grant_type: "refresh_token",
+            client_id: process.env.APALEO_CLIENT_ID as string,
+            client_secret: process.env.APALEO_CLIENT_SECRET as string,
+            refresh_token: token.refreshToken as string,
+          }),
+        });
+
+        const tokens = await response.json();
+
+        if (!response.ok) throw tokens;
+
+        return {
+          ...token,
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token ?? token.refreshToken,
+          expiresAt: Math.floor(Date.now() / 1000 + tokens.expires_in),
+        };
+      } catch (error) {
+        console.error("Error refreshing access token", error);
+        return { ...token, error: "RefreshAccessTokenError" };
+      }
     },
     async session({ session, token }) {
-      if (session) {
-        session.accessToken = token.accessToken;
-        session.error = token.error;
-      }
+      session.accessToken = token.accessToken;
+      session.error = token.error;
+      session.user = token.user;
       return session;
     },
   },
