@@ -1,10 +1,17 @@
 import NextAuth, { NextAuthOptions } from "next-auth";
 import type { User } from "next-auth";
-import OAuth2Provider from "next-auth/providers/oauth";
+import type { JWT } from "next-auth/jwt";
+import type { OAuthConfig, OAuthUserConfig } from "next-auth/providers";
+
+interface ApaleoProfile {
+  id: string;
+  name?: string;
+  email?: string;
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
-    OAuth2Provider({
+    {
       id: "apaleo",
       name: "Apaleo",
       type: "oauth",
@@ -18,14 +25,14 @@ export const authOptions: NextAuthOptions = {
       },
       token: "https://identity.apaleo.com/connect/token",
       userinfo: "https://app.apaleo.com/api/account/v1/accounts/current",
-      profile(profile) {
+      profile(profile: ApaleoProfile): User {
         return {
           id: profile.id,
           name: profile.name || "Apaleo User",
           email: profile.email,
         };
       },
-    }),
+    } as OAuthConfig<ApaleoProfile>,
   ],
   callbacks: {
     async jwt({ token, account, user }) {
@@ -40,7 +47,7 @@ export const authOptions: NextAuthOptions = {
       }
 
       // Return previous token if the access token has not expired yet
-      if (Date.now() < (token.expiresAt as number) * 1000) {
+      if (token.expiresAt && Date.now() < token.expiresAt * 1000) {
         return token;
       }
 
@@ -73,10 +80,12 @@ export const authOptions: NextAuthOptions = {
       }
     },
     async session({ session, token }) {
-      session.accessToken = token.accessToken;
-      session.error = token.error;
-      session.user = token.user;
-      return session;
+      return {
+        ...session,
+        accessToken: token.accessToken,
+        error: token.error,
+        user: token.user as User,
+      };
     },
   },
   pages: {
