@@ -1,5 +1,4 @@
-import NextAuth from "next-auth";
-import { NextAuthOptions } from "next-auth";
+import NextAuth, { NextAuthOptions, User } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import axios from "axios";
 
@@ -11,7 +10,7 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         code: { label: "Code", type: "text" },
       },
-      async authorize(credentials) {
+      async authorize(credentials): Promise<User | null> {
         if (!credentials?.code) return null;
 
         try {
@@ -44,7 +43,7 @@ export const authOptions: NextAuthOptions = {
             }
           );
 
-          return {
+          const user: User = {
             id: userResponse.data.id || "user-id",
             name: userResponse.data.name || "Apaleo User",
             email: userResponse.data.email || "user@example.com",
@@ -52,6 +51,8 @@ export const authOptions: NextAuthOptions = {
             refreshToken: refresh_token,
             expiresAt: Math.floor(Date.now() / 1000) + expires_in,
           };
+
+          return user;
         } catch (error) {
           console.error("Authentication error:", error);
           return null;
@@ -60,7 +61,7 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user, account }) {
+    async jwt({ token, user }) {
       if (user) {
         token.accessToken = user.accessToken;
         token.refreshToken = user.refreshToken;
@@ -102,8 +103,10 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      session.accessToken = token.accessToken;
-      session.error = token.error;
+      if (session) {
+        session.accessToken = token.accessToken;
+        session.error = token.error;
+      }
       return session;
     },
   },
