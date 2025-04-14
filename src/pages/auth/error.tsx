@@ -11,6 +11,10 @@ export default function Error() {
         return 'Invalid state parameter. This could be a security issue.';
       case 'RefreshAccessTokenError':
         return 'Failed to refresh access token. Please try signing in again.';
+      case 'configuration_error':
+        return 'Application configuration error. Please contact support.';
+      case 'CredentialsSignin':
+        return 'Authentication failed. Please check your credentials and try again.';
       default:
         return 'An error occurred during authentication. Please try again.';
     }

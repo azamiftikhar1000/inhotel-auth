@@ -11,7 +11,8 @@ export default function SignIn() {
 
     // Define only the allowed scopes for this client
     const scopes = [
-      'setup.read'
+      'setup.read',
+      'offline_access'
     ].join(' ');
 
     // Construct the apaleo authorization URL
@@ -23,6 +24,14 @@ export default function SignIn() {
       `&state=${state}`;
 
     console.log('Redirecting to:', authUrl); // Add this for debugging
+    
+    // Add error handling for missing environment variables
+    if (!process.env.NEXT_PUBLIC_APALEO_CLIENT_ID || !process.env.NEXT_PUBLIC_APALEO_REDIRECT_URI) {
+      console.error('Missing required environment variables');
+      window.location.href = '/auth/error?error=configuration_error';
+      return;
+    }
+    
     // Redirect to apaleo login
     window.location.href = authUrl;
   }, []);
