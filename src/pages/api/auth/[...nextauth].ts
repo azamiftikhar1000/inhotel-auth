@@ -20,7 +20,7 @@ export const authOptions: NextAuthOptions = {
       wellKnown: "https://identity.apaleo.com/.well-known/openid-configuration",
       authorization: {
         params: {
-          scope: "setup.read identity offline_access",
+          scope: "setup.read offline_access",
         },
       },
       token: "https://identity.apaleo.com/connect/token",
