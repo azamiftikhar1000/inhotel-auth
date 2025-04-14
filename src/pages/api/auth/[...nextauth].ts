@@ -10,6 +10,7 @@ interface ApaleoProfile {
 }
 
 export const authOptions: NextAuthOptions = {
+  debug: true,
   providers: [
     {
       id: "apaleo",
@@ -17,14 +18,33 @@ export const authOptions: NextAuthOptions = {
       type: "oauth",
       clientId: process.env.APALEO_CLIENT_ID,
       clientSecret: process.env.APALEO_CLIENT_SECRET,
-      wellKnown: "https://identity.apaleo.com/.well-known/openid-configuration",
       authorization: {
+        url: "https://identity.apaleo.com/connect/authorize",
         params: {
           scope: "setup.read offline_access",
+          response_type: "code",
         },
       },
-      token: "https://identity.apaleo.com/connect/token",
-      userinfo: "https://app.apaleo.com/api/account/v1/accounts/current",
+      token: {
+        url: "https://identity.apaleo.com/connect/token",
+        params: {
+          grant_type: "authorization_code",
+        },
+      },
+      userinfo: {
+        url: "https://app.apaleo.com/api/account/v1/accounts/current",
+        async request({ tokens, client }) {
+          const response = await fetch(
+            "https://app.apaleo.com/api/account/v1/accounts/current",
+            {
+              headers: {
+                Authorization: `Bearer ${tokens.access_token}`,
+              },
+            }
+          );
+          return await response.json();
+        },
+      },
       profile(profile: ApaleoProfile): User {
         return {
           id: profile.id,
@@ -90,6 +110,7 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: "/auth/signin",
+    error: "/auth/error",
   },
   session: {
     strategy: "jwt",
