@@ -44,7 +44,7 @@ export default function ErrorPage() {
               onClick={() => {
                 console.log('Retrying authentication from error page...');
                 signIn('apaleo', { 
-                  callbackUrl: 'https://inhotel-auth-4fbefd0bd04c.herokuapp.com/',
+                  callbackUrl: '/',
                   redirect: true
                 });
               }}
