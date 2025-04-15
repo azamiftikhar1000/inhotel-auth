@@ -27,71 +27,82 @@ export const authOptions: NextAuthOptions = {
       authorization: {
         url: "https://identity.apaleo.com/connect/authorize",
         params: {
-          scope: "offline_access setup.read",
+          scope: "offline_access openid profile setup.read",
           response_type: "code",
           redirect_uri: "https://inhotel-auth-4fbefd0bd04c.herokuapp.com/api/auth/callback/apaleo",
+          state: Math.random().toString(36).substring(7),
         },
       },
       token: {
         url: "https://identity.apaleo.com/connect/token",
         async request({ client, params }) {
           console.log("Token request params:", params);
-          const response = await fetch("https://identity.apaleo.com/connect/token", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded",
-              Accept: "application/json",
-            },
-            body: new URLSearchParams({
-              grant_type: "authorization_code",
-              client_id: client.clientId as string,
-              client_secret: client.clientSecret as string,
-              code: params.code as string,
-              redirect_uri: "https://inhotel-auth-4fbefd0bd04c.herokuapp.com/api/auth/callback/apaleo",
-            }).toString(),
-          });
+          try {
+            const response = await fetch("https://identity.apaleo.com/connect/token", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                Accept: "application/json",
+              },
+              body: new URLSearchParams({
+                grant_type: "authorization_code",
+                client_id: client.clientId as string,
+                client_secret: client.clientSecret as string,
+                code: params.code as string,
+                redirect_uri: "https://inhotel-auth-4fbefd0bd04c.herokuapp.com/api/auth/callback/apaleo",
+              }).toString(),
+            });
 
-          const tokens = await response.json();
-          console.log("Token response:", tokens);
-          
-          if (!response.ok) {
-            console.error("Token error:", tokens);
-            throw new Error(tokens.error || "Failed to get access token");
-          }
-
-          return {
-            tokens: {
-              access_token: tokens.access_token,
-              refresh_token: tokens.refresh_token,
-              expires_in: tokens.expires_in,
-              token_type: tokens.token_type,
+            const tokens = await response.json();
+            console.log("Token response status:", response.status);
+            
+            if (!response.ok) {
+              console.error("Token error:", tokens);
+              throw new Error(tokens.error_description || tokens.error || "Failed to get access token");
             }
-          };
+
+            return {
+              tokens: {
+                access_token: tokens.access_token,
+                refresh_token: tokens.refresh_token,
+                expires_in: tokens.expires_in,
+                token_type: tokens.token_type,
+              }
+            };
+          } catch (error) {
+            console.error("Exception during token exchange:", error);
+            throw error;
+          }
         },
       },
       userinfo: {
         url: "https://api.apaleo.com/accounts/v1/accounts/current",
         async request({ tokens }) {
-          console.log("Userinfo request with token:", tokens.access_token);
-          const response = await fetch(
-            "https://api.apaleo.com/accounts/v1/accounts/current",
-            {
-              headers: {
-                Authorization: `Bearer ${tokens.access_token}`,
-                Accept: "application/json",
-              },
+          console.log("Userinfo request with token");
+          try {
+            const response = await fetch(
+              "https://api.apaleo.com/accounts/v1/accounts/current",
+              {
+                headers: {
+                  Authorization: `Bearer ${tokens.access_token}`,
+                  Accept: "application/json",
+                },
+              }
+            );
+            
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error("Userinfo error status:", response.status, "Error:", errorText);
+              throw new Error(`Failed to get user info: ${response.status} ${errorText}`);
             }
-          );
-          
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error("Userinfo error:", errorText);
-            throw new Error("Failed to get user info");
-          }
 
-          const profile = await response.json();
-          console.log("Profile response:", profile);
-          return profile;
+            const profile = await response.json();
+            console.log("Profile response received successfully");
+            return profile;
+          } catch (error) {
+            console.error("Exception during userinfo request:", error);
+            throw error;
+          }
         },
       },
       profile(profile, tokens) {
@@ -124,6 +135,7 @@ export const authOptions: NextAuthOptions = {
 
       // Access token has expired, try to update it
       try {
+        console.log("Refreshing access token");
         const response = await fetch("https://identity.apaleo.com/connect/token", {
           method: "POST",
           headers: {
@@ -139,10 +151,14 @@ export const authOptions: NextAuthOptions = {
         });
 
         const tokens = await response.json();
-        console.log("Token refresh response:", tokens);
+        console.log("Token refresh response status:", response.status);
 
-        if (!response.ok) throw tokens;
+        if (!response.ok) {
+          console.error("Token refresh error:", tokens);
+          throw new Error(tokens.error_description || tokens.error || "Failed to refresh token");
+        }
 
+        console.log("Successfully refreshed token");
         return {
           ...token,
           accessToken: tokens.access_token,
@@ -151,7 +167,11 @@ export const authOptions: NextAuthOptions = {
         };
       } catch (error) {
         console.error("Error refreshing access token", error);
-        return { ...token, error: "RefreshAccessTokenError" };
+        // Return previous token with error
+        return { 
+          ...token, 
+          error: "RefreshAccessTokenError" 
+        };
       }
     },
     async session({ session, token }) {
