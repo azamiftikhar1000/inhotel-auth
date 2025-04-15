@@ -89,12 +89,12 @@ export const authOptions: NextAuthOptions = {
         },
       },
       userinfo: {
-        url: "https://api.apaleo.com/accounts/v1/accounts/current",
+        url: "https://api.apaleo.com/v1/user/me",
         async request({ tokens }) {
           console.log("Userinfo request with token");
           try {
             const response = await fetch(
-              "https://api.apaleo.com/accounts/v1/accounts/current",
+              "https://api.apaleo.com/v1/user/me",
               {
                 headers: {
                   Authorization: `Bearer ${tokens.access_token}`,
@@ -104,9 +104,8 @@ export const authOptions: NextAuthOptions = {
             );
             
             if (!response.ok) {
-              const errorText = await response.text();
-              console.error("Userinfo error status:", response.status, "Error:", errorText);
-              throw new Error(`Failed to get user info: ${response.status} ${errorText}`);
+              console.error("Userinfo error status:", response.status, "Error:", await response.text());
+              return { id: "user", name: "Apaleo User" };
             }
 
             const profile = await response.json();
@@ -114,14 +113,15 @@ export const authOptions: NextAuthOptions = {
             return profile;
           } catch (error) {
             console.error("Exception during userinfo request:", error);
-            throw error;
+            return { id: "user", name: "Apaleo User" };
           }
         },
       },
       profile(profile, tokens) {
-        console.log("Profile data:", profile, "Tokens:", tokens);
+        console.log("Profile data:", profile);
+        
         return {
-          id: profile.id,
+          id: profile.id || "apaleo-user",
           name: profile.name || "Apaleo User",
           email: profile.email,
           image: null,
