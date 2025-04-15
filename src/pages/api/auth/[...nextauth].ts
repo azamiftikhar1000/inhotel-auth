@@ -89,12 +89,12 @@ export const authOptions: NextAuthOptions = {
         },
       },
       userinfo: {
-        url: "https://api.apaleo.com/v1/user/me",
+        url: "https://identity.apaleo.com/connect/userinfo",
         async request({ tokens }) {
           console.log("Userinfo request with token");
           try {
             const response = await fetch(
-              "https://api.apaleo.com/v1/user/me",
+              "https://identity.apaleo.com/connect/userinfo",
               {
                 headers: {
                   Authorization: `Bearer ${tokens.access_token}`,
@@ -120,11 +120,12 @@ export const authOptions: NextAuthOptions = {
       profile(profile, tokens) {
         console.log("Profile data:", profile);
         
+        // Handle standard OpenID Connect claims
         return {
-          id: profile.id || "apaleo-user",
+          id: profile.sub || profile.id || "apaleo-user",
           name: profile.name || "Apaleo User",
           email: profile.email,
-          image: null,
+          image: profile.picture || null,
         };
       },
     },
