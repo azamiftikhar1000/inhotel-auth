@@ -37,12 +37,17 @@ export const authOptions: NextAuthOptions = {
         url: "https://identity.apaleo.com/connect/token",
         async request({ client, params }) {
           console.log("Token request params:", params);
-          console.log("Using client ID:", client.clientId);
-          console.log("Client secret length:", (client.clientSecret as string).length);
+          
+          // Get credentials directly from environment
+          const clientId = process.env.APALEO_CLIENT_ID;
+          const clientSecret = process.env.APALEO_CLIENT_SECRET;
+          
+          console.log("Using client ID from env:", clientId);
+          console.log("Client secret length from env:", clientSecret?.length || 0);
           
           try {
             // Create Basic Auth header
-            const basicAuth = Buffer.from(`${client.clientId}:${client.clientSecret}`).toString('base64');
+            const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
             console.log("Basic Auth header created (first 10 chars):", basicAuth.substring(0, 10) + "...");
             
             const response = await fetch("https://identity.apaleo.com/connect/token", {
@@ -54,8 +59,8 @@ export const authOptions: NextAuthOptions = {
               },
               body: new URLSearchParams({
                 grant_type: "authorization_code",
-                client_id: client.clientId as string,       // Include in body too
-                client_secret: client.clientSecret as string, // Include in body too
+                client_id: clientId as string,
+                client_secret: clientSecret as string,
                 code: params.code as string,
                 redirect_uri: "https://inhotel-auth-4fbefd0bd04c.herokuapp.com/api/auth/callback/apaleo",
               }).toString(),
