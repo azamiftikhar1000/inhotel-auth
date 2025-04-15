@@ -38,16 +38,18 @@ export const authOptions: NextAuthOptions = {
         async request({ client, params }) {
           console.log("Token request params:", params);
           try {
+            // Create Basic Auth header
+            const basicAuth = Buffer.from(`${client.clientId}:${client.clientSecret}`).toString('base64');
+            
             const response = await fetch("https://identity.apaleo.com/connect/token", {
               method: "POST",
               headers: {
                 "Content-Type": "application/x-www-form-urlencoded",
-                Accept: "application/json",
+                "Authorization": `Basic ${basicAuth}`,
+                "Accept": "application/json",
               },
               body: new URLSearchParams({
                 grant_type: "authorization_code",
-                client_id: client.clientId as string,
-                client_secret: client.clientSecret as string,
                 code: params.code as string,
                 redirect_uri: "https://inhotel-auth-4fbefd0bd04c.herokuapp.com/api/auth/callback/apaleo",
               }).toString(),
@@ -136,16 +138,18 @@ export const authOptions: NextAuthOptions = {
       // Access token has expired, try to update it
       try {
         console.log("Refreshing access token");
+        // Create Basic Auth header
+        const basicAuth = Buffer.from(`${process.env.APALEO_CLIENT_ID}:${process.env.APALEO_CLIENT_SECRET}`).toString('base64');
+        
         const response = await fetch("https://identity.apaleo.com/connect/token", {
           method: "POST",
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
-            Accept: "application/json",
+            "Authorization": `Basic ${basicAuth}`,
+            "Accept": "application/json",
           },
           body: new URLSearchParams({
             grant_type: "refresh_token",
-            client_id: process.env.APALEO_CLIENT_ID as string,
-            client_secret: process.env.APALEO_CLIENT_SECRET as string,
             refresh_token: token.refreshToken as string,
           }).toString(),
         });
