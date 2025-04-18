@@ -88,4 +88,9 @@ Remember to:
 - All sensitive information is stored server-side
 - CSRF protection is implemented using state parameters
 - Tokens are automatically refreshed when expired
-- Environment variables are properly segregated between client and server 
+- Environment variables are properly segregated between client and server
+
+## ENV
+https://inhotel-auth-4fbefd0bd04c.herokuapp.com/api/auth/callback/apaleo
+APALEO_CLIENT_ID : KHWD-AC-INHOTEL_STAFF_ASSISTANT
+APALEO_CLIENT_SECRET: 81ihwXZZL5rNt6XWxe01CBtsWHrwkd
