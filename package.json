@@ -1,5 +1,5 @@
 {
-  "name": "apaleo-integration",
+  "name": "oauth-callback-service",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -10,8 +10,9 @@
   },
   "dependencies": {
     "axios": "^1.6.7",
+    "dotenv": "^16.5.0",
+    "mongodb": "^6.15.0",
     "next": "^14.1.0",
-    "next-auth": "^4.24.5",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
@@ -26,4 +27,4 @@
     "tailwindcss": "^3.4.0",
     "typescript": "^5.3.3"
   }
-} 
+}

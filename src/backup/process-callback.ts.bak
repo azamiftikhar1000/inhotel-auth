@@ -1,0 +1,113 @@
+import { NextApiRequest, NextApiResponse } from 'next';
+import { MongoClient } from 'mongodb';
+
+interface SessionDocument {
+  _id: string;
+  token: string;
+  // Add other fields as needed
+}
+
+interface ConnectionDefinition {
+  _id: string;
+  platform: string;
+  // Add other fields as needed
+}
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Only accept POST requests
+  if (req.method !== 'POST') {
+    return res.status(405).json({ message: 'Method not allowed' });
+  }
+
+  try {
+    const { sessionId, code, clientId, redirectUri } = req.body;
+
+    if (!sessionId || !code) {
+      return res.status(400).json({ message: 'Missing required parameters' });
+    }
+
+    // Connect to MongoDB
+    const uri = process.env.MONGO_URI || 'mongodb://localhost:27017';
+    const client = new MongoClient(uri, {
+      auth: {
+        username: process.env.MONGO_USER || 'pica',
+        password: process.env.MONGO_PASSWORD || 'picapassword'
+      }
+    });
+    
+    await client.connect();
+    console.log('Connected to MongoDB');
+    
+    // Query the sessions collection
+    const database = client.db(process.env.MONGO_DATABASE || 'pica');
+    const sessionsCollection = database.collection<SessionDocument>('sessions');
+    
+    // Find the session with matching _id
+    const session = await sessionsCollection.findOne({ _id: sessionId });
+    
+    if (!session) {
+      await client.close();
+      return res.status(404).json({ message: 'Session not found' });
+    }
+    
+    const linkToken = session.token;
+    console.log('Link Token:', linkToken);
+    
+    // Get connectionDefinitionId from connection-definitions collection
+    const connectionDefsCollection = database.collection<ConnectionDefinition>('connection-definitions');
+    const connectionDef = await connectionDefsCollection.findOne({ platform: 'apaleo' });
+    
+    if (!connectionDef) {
+      await client.close();
+      return res.status(404).json({ message: 'Connection definition not found for apaleo' });
+    }
+    
+    const connectionDefinitionId = connectionDef._id;
+    console.log('Connection Definition ID:', connectionDefinitionId);
+    
+    // Close MongoDB connection
+    await client.close();
+    
+    // Make POST request to create OAuth embed connection
+    const response = await fetch(process.env.API_ENDPOINT || 'http://localhost:3001/public/v1/event-links/create-oauth-embed-connection', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Pica-Secret': process.env.X_PICA_SECRET || ''
+      },
+      body: JSON.stringify({
+        linkToken: linkToken,
+        formData: {
+          clientId: clientId
+        },
+        connectionDefinitionId: connectionDefinitionId,
+        type: "apaleo",
+        code: code,
+        redirectUri: redirectUri,
+        clientId: clientId
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      return res.status(response.status).json({
+        message: 'API Error',
+        details: result
+      });
+    }
+    
+    // Return success response
+    return res.status(200).json({
+      success: true,
+      data: result
+    });
+    
+  } catch (error) {
+    console.error('Error processing callback:', error);
+    return res.status(500).json({
+      message: 'Internal server error',
+      error: String(error)
+    });
+  }
+} 
