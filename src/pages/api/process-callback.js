@@ -10,9 +10,6 @@ export default async function handler(req, res) {
   try {
     const { sessionId, code, clientId: providedClientId, redirectUri: providedRedirectUri } = req.body;
 
-    // Use the exact redirectUri regardless of what was provided
-    const redirectUri = "https://77bd-117-96-42-23.ngrok-free.app/auth/callback";
-
     console.log('Received API request with data:', {
       sessionId, 
       codeLength: code ? code.length : 0,
@@ -151,7 +148,7 @@ export default async function handler(req, res) {
       }
       
       // Make POST request to create OAuth embed connection
-      const apiEndpoint = process.env.API_ENDPOINT || 'http://localhost:3001/public/v1/event-links/create-oauth-embed-connection';
+      const apiEndpoint = process.env.API_ENDPOINT || 'https://platform-backend.inhotel.io/public/v1/event-links/create-oauth-embed-connection';
       console.log('Making request to:', apiEndpoint);
       console.log('Using hardcoded redirectUri:', redirectUri);
       console.log('Request body:', JSON.stringify({
@@ -200,7 +197,7 @@ export default async function handler(req, res) {
 
       // Now update the embed token with successful connection status
       try {
-        const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
+        const baseUrl = process.env.BASE_URL || 'https://platform-backend.inhotel.io/';
         const updateEndpoint = `${baseUrl}/public/v1/embed-tokens/update`;
         console.log(`Updating embed token status at: ${updateEndpoint}`);
         
