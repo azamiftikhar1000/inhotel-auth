@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 
 export default function Callback() {
   const router = useRouter();
-  const { code, state, scope, client_id, redirect_uri } = router.query;
+  const { code, state, scope } = router.query;
   const [status, setStatus] = useState('Processing');
   const [error, setError] = useState('');
   const [details, setDetails] = useState<string>('');
@@ -23,8 +23,6 @@ export default function Callback() {
         addLog('Callback page loaded');
         addLog(`Code param: ${code ? `${code.toString().substring(0, 10)}...` : 'missing'}`);
         addLog(`State param: ${state || 'missing'}`);
-        addLog(`ClientId param: ${client_id || 'missing'}`);
-        addLog(`RedirectUri param: ${redirect_uri || 'missing'}`);
         
         if (!code || !state) {
           setError('Missing required parameters (code or state)');
@@ -34,7 +32,7 @@ export default function Callback() {
         // Get sessionId from state parameter
         const stateString = state as string;
         let sessionId = '';
-        
+        let type = '';
         addLog(`Parsing state parameter: ${stateString}`);
         
         // If state is already in the format session_id::XXX::YYY, use it directly
@@ -48,6 +46,7 @@ export default function Callback() {
           const stateParts = stateString.split('::');
           addLog(`Split state into ${stateParts.length} parts: ${JSON.stringify(stateParts)}`);
           
+          type = stateParts[0];
           // Check if this is the airtable format with session_id component
           if (stateParts.length >= 4 && stateParts[1] === 'session_id') {
             // Reconstruct the full session ID
@@ -61,13 +60,6 @@ export default function Callback() {
           }
         }
         
-        // Use values from URL params, falling back to defaults
-        const clientId = client_id as string || router.query.clientId as string || 'QWMI-AC-APALEO_PICA';
-        const redirectUri = redirect_uri as string || router.query.redirectUri as string || window.location.origin + '/auth/callback';
-        
-        addLog(`Using clientId: ${clientId}`);
-        addLog(`Using redirectUri: ${redirectUri}`);
-        
         setStatus('Contacting server...');
         addLog('Making API request to /api/process-callback');
         
@@ -80,8 +72,7 @@ export default function Callback() {
           body: JSON.stringify({
             sessionId,
             code,
-            clientId,
-            redirectUri
+            type
           })
         });
         
@@ -119,7 +110,7 @@ export default function Callback() {
     if (router.isReady) {
       handleCallback();
     }
-  }, [router.isReady, router, code, state, scope, client_id, redirect_uri]);
+  }, [router.isReady, router, code, state, scope]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -147,9 +138,7 @@ export default function Callback() {
                 <pre>{JSON.stringify({
                   code: code ? `${String(code).substring(0, 10)}...` : null,
                   state,
-                  scope,
-                  client_id,
-                  redirect_uri
+                  scope
                 }, null, 2)}</pre>
               </div>
             </div>

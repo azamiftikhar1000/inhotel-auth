@@ -8,17 +8,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { sessionId, code, clientId: providedClientId, redirectUri: providedRedirectUri } = req.body;
-
-    // Use the redirectUri provided by the client
-    const redirectUri = providedRedirectUri;
+    const { sessionId, code, type} = req.body;
 
     console.log('Received API request with data:', {
       sessionId, 
       codeLength: code ? code.length : 0,
-      providedClientId,
-      providedRedirectUri,
-      usingRedirectUri: redirectUri
+      type
     });
 
     if (!sessionId || !code) {
@@ -31,10 +26,6 @@ export default async function handler(req, res) {
       length: sessionId ? sessionId.length : 0,
       format: sessionId ? (sessionId.startsWith('session_id::') ? 'valid' : 'invalid') : 'missing'
     });
-
-    // Always use providedClientId as the starting point, fallback to a default if needed
-    let clientId = providedClientId || '';
-    console.log('Initial clientId from parameters:', clientId || '(empty)');
 
     // Connect to MongoDB
     const uri = process.env.MONGO_URI || 'mongodb://localhost:27017';
@@ -58,6 +49,7 @@ export default async function handler(req, res) {
       // Query the embed-tokens collection
       const database = client.db(process.env.MONGO_DATABASE || 'events-service');
       const embedTokensCollection = database.collection('embed-tokens');
+      const connectionOauthDefinitionsCollection = database.collection('connection-oauth-definitions');
       
       // Find the embed token with matching sessionId
       console.log('Looking for embed token with sessionId:', sessionId);
@@ -98,61 +90,69 @@ export default async function handler(req, res) {
       
       const linkToken = embedToken.linkSettings.eventIncToken;
       console.log('Link Token found (eventIncToken):', linkToken);
-      
-      // Get connectionDefinitionId from connection-definitions collection
-      const connectionDefsCollection = database.collection('connection-definitions');
-      const connectionDef = await connectionDefsCollection.findOne({ platform: 'apaleo' });
-      
-      if (!connectionDef) {
-        console.log('Connection definition not found for apaleo');
-        
-        // Log all available connection definitions
-        const connectionDefs = await connectionDefsCollection.find({}).toArray();
-        console.log(`Found ${connectionDefs.length} connection definitions:`);
-        connectionDefs.forEach(def => {
-          console.log(`- ${def._id}, platform: ${def.platform}`);
-        });
-        
-        return res.status(404).json({ message: 'Connection definition not found for apaleo' });
+
+      const connectionOauthDefinition = await connectionOauthDefinitionsCollection.findOne({ connectionPlatform: type });
+      if (!connectionOauthDefinition) {
+        console.log('Connection OAuth Definition not found for platform:', type);
+        return res.status(404).json({ message: 'Connection OAuth Definition not found for platform' });
       }
+      console.log('Connection OAuth Definition found:', connectionOauthDefinition);
+      const redirectUri = connectionOauthDefinition.frontend.iosRedirectUri;
       
-      console.log('Found connection definition:', JSON.stringify(connectionDef, null, 2));
+      // // Get connectionDefinitionId from connection-definitions collection
+      // const connectionDefsCollection = database.collection('connection-definitions');
+      // const connectionDef = await connectionDefsCollection.findOne({ platform: type });
       
-      const connectionDefinitionId = connectionDef._id;
-      console.log('Connection Definition ID:', connectionDefinitionId);
+      // if (!connectionDef) {
+      //   console.log('Connection definition not found for apaleo');
+        
+      //   // Log all available connection definitions
+      //   const connectionDefs = await connectionDefsCollection.find({}).toArray();
+      //   console.log(`Found ${connectionDefs.length} connection definitions:`);
+      //   connectionDefs.forEach(def => {
+      //     console.log(`- ${def._id}, platform: ${def.platform}`);
+      //   });
+        
+      //   return res.status(404).json({ message: 'Connection definition not found for apaleo' });
+      // }
+      
+      // console.log('Found connection definition:', JSON.stringify(connectionDef, null, 2));
+      
+      // const connectionDefinitionId = connectionDef._id;
+      // console.log('Connection Definition ID:', connectionDefinitionId);
+      
+      let connectionDefinitionId = '';
+      let clientId = '';
       
       // Try to extract clientId from embed token's connectedPlatforms if available
       if (embedToken.linkSettings && 
           embedToken.linkSettings.connectedPlatforms && 
           Array.isArray(embedToken.linkSettings.connectedPlatforms)) {
         
-        console.log('Found connectedPlatforms in embed token, looking for matching connectionDefinitionId:', connectionDefinitionId);
+        console.log('Found connectedPlatforms in embed token, looking for matching platform type:', type);
         
-        // Find the platform with matching connectionDefinitionId
+        // Find the platform with matching type
         const matchingPlatform = embedToken.linkSettings.connectedPlatforms.find(
-          platform => platform.connectionDefinitionId === connectionDefinitionId
+          platform => platform.type === type
         );
         
-        if (matchingPlatform) {
-          console.log('Found matching platform:', JSON.stringify(matchingPlatform, null, 2));
-          
-          if (matchingPlatform.secret && matchingPlatform.secret.clientId) {
-            // If we have a clientId in the token, prefer it over the provided one
-            if (!clientId) {
-              clientId = matchingPlatform.secret.clientId;
-              console.log(`Using clientId from embed token's connected platform: ${clientId}`);
-            } else {
-              console.log(`Keeping provided clientId: ${clientId} (instead of token's: ${matchingPlatform.secret.clientId})`);
-            }
-          } else {
-            console.log('No clientId found in matching platform secret');
-          }
-        } else {
-          console.log('No matching platform found for connectionDefinitionId:', connectionDefinitionId);
+        if (!matchingPlatform) {
+          console.log('No matching platform found for platform:', type);
           console.log('Available platforms:', JSON.stringify(embedToken.linkSettings.connectedPlatforms.map(p => ({ 
             connectionDefinitionId: p.connectionDefinitionId,
             type: p.type
           })), null, 2));
+        } else {
+          console.log('Found matching platform:', JSON.stringify(matchingPlatform, null, 2));
+          connectionDefinitionId = matchingPlatform.connectionDefinitionId;
+          
+          if (matchingPlatform.secret && matchingPlatform.secret.clientId) {
+            // If we have a clientId in the token, prefer it over the provided one
+            clientId = matchingPlatform.secret.clientId;
+            console.log(`Using clientId from embed token's connected platform: ${clientId}`);
+          } else {
+            console.log(`TODO: Get clientId from secretsServiceId (instead of token's clientId)`);
+          }
         }
       } else {
         console.log('No connectedPlatforms found in embed token, using provided clientId');
@@ -160,8 +160,8 @@ export default async function handler(req, res) {
       
       // Set a default clientId if none was found
       if (!clientId) {
-        console.log('Warning: No clientId available, using default: QWMI-AC-APALEO_PICA');
-        clientId = 'QWMI-AC-APALEO_PICA';
+        console.error('Error: No clientId available');
+        return res.status(400).json({ message: 'No clientId available' });
       }
       
       // Make POST request to create OAuth embed connection
@@ -172,9 +172,7 @@ export default async function handler(req, res) {
       // Create a properly structured request body
       const requestBody = {
         linkToken: linkToken,
-        formData: {
-          
-        },
+        formData: {},
         connectionDefinitionId: connectionDefinitionId,
         type: "apaleo",
         code: code,
