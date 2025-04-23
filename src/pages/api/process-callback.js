@@ -10,6 +10,9 @@ export default async function handler(req, res) {
   try {
     const { sessionId, code, clientId: providedClientId, redirectUri: providedRedirectUri } = req.body;
 
+    // Use the exact redirectUri regardless of what was provided
+    const redirectUri = "https://inhotel-auth-4fbefd0bd04c.herokuapp.com/auth/callback";
+
     console.log('Received API request with data:', {
       sessionId, 
       codeLength: code ? code.length : 0,
@@ -162,7 +165,7 @@ export default async function handler(req, res) {
         redirectUri: redirectUri,
         clientId: clientId
       }, null, 2));
-      console.log('X-Pica-Secret:', process.env.X_PICA_SECRET);
+      
       const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: {
@@ -197,7 +200,7 @@ export default async function handler(req, res) {
 
       // Now update the embed token with successful connection status
       try {
-        const baseUrl = process.env.BASE_URL || 'https://platform-backend.inhotel.io/';
+        const baseUrl = process.env.BASE_URL || 'https://platform-backend.inhotel.io';
         const updateEndpoint = `${baseUrl}/public/v1/embed-tokens/update`;
         console.log(`Updating embed token status at: ${updateEndpoint}`);
         
