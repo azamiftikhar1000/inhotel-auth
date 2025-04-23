@@ -25,6 +25,13 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Missing required parameters' });
     }
 
+    // Debug session ID format
+    console.log('Session ID format check:', {
+      sessionId,
+      length: sessionId ? sessionId.length : 0,
+      format: sessionId ? (sessionId.startsWith('session_id::') ? 'valid' : 'invalid') : 'missing'
+    });
+
     // Always use providedClientId as the starting point, fallback to a default if needed
     let clientId = providedClientId || '';
     console.log('Initial clientId from parameters:', clientId || '(empty)');
@@ -161,17 +168,21 @@ export default async function handler(req, res) {
       const apiEndpoint = process.env.API_ENDPOINT || 'https://platform-backend.inhotel.io/public/v1/event-links/create-oauth-embed-connection';
       console.log('Making request to:', apiEndpoint);
       console.log('Using redirectUri:', redirectUri);
-      console.log('Request body:', JSON.stringify({
+      
+      // Create a properly structured request body
+      const requestBody = {
         linkToken: linkToken,
         formData: {
-          clientId: clientId
+          
         },
         connectionDefinitionId: connectionDefinitionId,
         type: "apaleo",
         code: code,
         redirectUri: redirectUri,
         clientId: clientId
-      }, null, 2));
+      };
+      
+      console.log('Request body:', JSON.stringify(requestBody, null, 2));
       
       const response = await fetch(apiEndpoint, {
         method: 'POST',
@@ -179,17 +190,7 @@ export default async function handler(req, res) {
           'Content-Type': 'application/json',
           'X-Pica-Secret': process.env.X_PICA_SECRET || ''
         },
-        body: JSON.stringify({
-          linkToken: linkToken,
-          formData: {
-            clientId: clientId
-          },
-          connectionDefinitionId: connectionDefinitionId,
-          type: "apaleo",
-          code: code,
-          redirectUri: redirectUri,
-          clientId: clientId
-        })
+        body: JSON.stringify(requestBody)
       });
       
       console.log('API Response status:', response.status);
@@ -197,9 +198,31 @@ export default async function handler(req, res) {
       
       if (!response.ok) {
         console.log('API Error:', response.status, JSON.stringify(result, null, 2));
+        
+        // Enhanced error messages based on common failure patterns
+        let errorMessage = 'API Error';
+        let errorDetails = result;
+        
+        // Check for specific error patterns in the response
+        if (result && result.name === 'MoleculerError' && result.message) {
+          if (typeof result.message === 'object' && result.message.message) {
+            if (result.message.message === 'Invalid connection credentials') {
+              // This is likely a redirect_uri or client_id mismatch
+              errorMessage = 'OAuth credentials error: The redirect URI or client ID might not match what the provider expects';
+              
+              // Log the values being used for debugging
+              console.log('Debug values for OAuth error:', {
+                clientId,
+                redirectUri,
+                codeLength: code ? code.length : 0
+              });
+            }
+          }
+        }
+        
         return res.status(response.status).json({
-          message: 'API Error',
-          details: result
+          message: errorMessage,
+          details: errorDetails
         });
       }
       
