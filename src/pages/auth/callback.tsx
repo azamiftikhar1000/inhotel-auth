@@ -62,8 +62,8 @@ export default function Callback() {
         }
         
         // Use values from URL params, falling back to defaults
-        const clientId = client_id as string || router.query.clientId as string || '';
-        const redirectUri = redirect_uri as string || router.query.redirectUri as string || window.location.origin;
+        const clientId = client_id as string || router.query.clientId as string || 'QWMI-AC-APALEO_PICA';
+        const redirectUri = redirect_uri as string || router.query.redirectUri as string || window.location.origin + '/auth/callback';
         
         addLog(`Using clientId: ${clientId}`);
         addLog(`Using redirectUri: ${redirectUri}`);

@@ -10,8 +10,8 @@ export default async function handler(req, res) {
   try {
     const { sessionId, code, clientId: providedClientId, redirectUri: providedRedirectUri } = req.body;
 
-    // Use the exact redirectUri regardless of what was provided
-    const redirectUri = "https://inhotel-auth-4fbefd0bd04c.herokuapp.com/auth/callback";
+    // Use the redirectUri provided by the client
+    const redirectUri = providedRedirectUri;
 
     console.log('Received API request with data:', {
       sessionId, 
@@ -24,6 +24,10 @@ export default async function handler(req, res) {
     if (!sessionId || !code) {
       return res.status(400).json({ message: 'Missing required parameters' });
     }
+
+    // Always use providedClientId as the starting point, fallback to a default if needed
+    let clientId = providedClientId || '';
+    console.log('Initial clientId from parameters:', clientId || '(empty)');
 
     // Connect to MongoDB
     const uri = process.env.MONGO_URI || 'mongodb://localhost:27017';
@@ -110,9 +114,6 @@ export default async function handler(req, res) {
       const connectionDefinitionId = connectionDef._id;
       console.log('Connection Definition ID:', connectionDefinitionId);
       
-      // Get clientId from connectedPlatforms matching the connectionDefinitionId
-      let clientId = providedClientId;
-      
       // Try to extract clientId from embed token's connectedPlatforms if available
       if (embedToken.linkSettings && 
           embedToken.linkSettings.connectedPlatforms && 
@@ -129,8 +130,13 @@ export default async function handler(req, res) {
           console.log('Found matching platform:', JSON.stringify(matchingPlatform, null, 2));
           
           if (matchingPlatform.secret && matchingPlatform.secret.clientId) {
-            clientId = matchingPlatform.secret.clientId;
-            console.log(`Using clientId from embed token's connected platform: ${clientId}`);
+            // If we have a clientId in the token, prefer it over the provided one
+            if (!clientId) {
+              clientId = matchingPlatform.secret.clientId;
+              console.log(`Using clientId from embed token's connected platform: ${clientId}`);
+            } else {
+              console.log(`Keeping provided clientId: ${clientId} (instead of token's: ${matchingPlatform.secret.clientId})`);
+            }
           } else {
             console.log('No clientId found in matching platform secret');
           }
@@ -145,15 +151,16 @@ export default async function handler(req, res) {
         console.log('No connectedPlatforms found in embed token, using provided clientId');
       }
       
+      // Set a default clientId if none was found
       if (!clientId) {
-        console.log('Warning: No clientId available, using empty string');
-        clientId = '';
+        console.log('Warning: No clientId available, using default: QWMI-AC-APALEO_PICA');
+        clientId = 'QWMI-AC-APALEO_PICA';
       }
       
       // Make POST request to create OAuth embed connection
       const apiEndpoint = process.env.API_ENDPOINT || 'https://platform-backend.inhotel.io/public/v1/event-links/create-oauth-embed-connection';
       console.log('Making request to:', apiEndpoint);
-      console.log('Using hardcoded redirectUri:', redirectUri);
+      console.log('Using redirectUri:', redirectUri);
       console.log('Request body:', JSON.stringify({
         linkToken: linkToken,
         formData: {
