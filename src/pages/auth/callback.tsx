@@ -103,11 +103,8 @@ export default function Callback() {
         addLog(`API Success: ${JSON.stringify(result, null, 2)}`);
         
         // Redirect to a success page or show a success message
-        addLog('Will close window in 5 seconds');
-        setTimeout(() => {
-          addLog('Closing window');
-          window.close(); // Close the window after successful completion
-        }, 5000);
+        addLog('Closing window');
+        window.close(); // Close the window immediately after successful completion
         
       } catch (error) {
         const errorMsg = `Error processing callback: ${error}`;
@@ -139,9 +136,9 @@ export default function Callback() {
           )}
           
           {/* Debug information */}
+          {/**
           <div className="mt-8">
             <h3 className="text-lg font-medium text-gray-900 mb-2">Debug Information</h3>
-            
             <div className="mb-4">
               <h4 className="text-sm font-bold mb-1">Query Parameters:</h4>
               <div className="bg-gray-100 p-2 rounded text-xs">
@@ -152,7 +149,6 @@ export default function Callback() {
                 }, null, 2)}</pre>
               </div>
             </div>
-            
             {logs.length > 0 && (
               <div className="mb-4">
                 <h4 className="text-sm font-bold mb-1">Logs:</h4>
@@ -163,7 +159,6 @@ export default function Callback() {
                 </div>
               </div>
             )}
-            
             {details && (
               <div className="mb-4">
                 <h4 className="text-sm font-bold mb-1">Response Details:</h4>
@@ -173,6 +168,7 @@ export default function Callback() {
               </div>
             )}
           </div>
+          */}
         </div>
       </div>
     </div>
