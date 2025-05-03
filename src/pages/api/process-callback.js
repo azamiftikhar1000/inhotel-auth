@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { sessionId, code, type} = req.body;
+    const { sessionId, code, type, secret } = req.body;
 
     console.log('Received API request with data:', {
       sessionId, 
@@ -186,7 +186,7 @@ export default async function handler(req, res) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Pica-Secret': process.env.X_PICA_SECRET || ''
+          'X-Pica-Secret': secret || process.env.X_PICA_SECRET || ''
         },
         body: JSON.stringify(requestBody)
       });
@@ -246,7 +246,7 @@ export default async function handler(req, res) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Pica-Secret': process.env.X_PICA_SECRET || ''
+            'X-Pica-Secret': secret || process.env.X_PICA_SECRET || ''
           },
           body: JSON.stringify(updatePayload)
         });

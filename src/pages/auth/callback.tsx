@@ -33,17 +33,25 @@ export default function Callback() {
         const stateString = state as string;
         let sessionId = '';
         let type = '';
+        let secret = '';
         addLog(`Parsing state parameter: ${stateString}`);
         
+        // Split state string by # to get the secret
+        const [statePart, secretPart] = stateString.split('#');
+        if (secretPart) {
+          secret = secretPart;
+          addLog(`Found secret in state parameter`);
+        }
+        
         // If state is already in the format session_id::XXX::YYY, use it directly
-        if (stateString.startsWith('session_id::')) {
-          sessionId = stateString;
+        if (statePart.startsWith('session_id::')) {
+          sessionId = statePart;
           addLog(`Using full state as session ID: ${sessionId}`);
         }
         // Format: airtable::session_id::GDeb6ZDUl_o::hr5KO0lNSuejI-iYrP-0ZA
         else {
           addLog('State does not start with session_id::, trying to parse parts');
-          const stateParts = stateString.split('::');
+          const stateParts = statePart.split('::');
           addLog(`Split state into ${stateParts.length} parts: ${JSON.stringify(stateParts)}`);
           
           type = stateParts[0];
@@ -68,11 +76,13 @@ export default function Callback() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'X-Pica-Secret': secret || process.env.X_PICA_SECRET || '' // Add the secret to the request headers
           },
           body: JSON.stringify({
             sessionId,
             code,
-            type
+            type,
+            secret
           })
         });
         
