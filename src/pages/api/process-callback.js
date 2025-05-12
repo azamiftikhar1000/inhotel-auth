@@ -174,7 +174,7 @@ export default async function handler(req, res) {
         linkToken: linkToken,
         formData: {},
         connectionDefinitionId: connectionDefinitionId,
-        type: "apaleo",
+        type: type,
         code: code,
         redirectUri: redirectUri,
         clientId: clientId
