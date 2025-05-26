@@ -33,13 +33,13 @@ This is a Next.js application that implements OAuth authentication with Apaleo f
    ```env
    APALEO_CLIENT_ID=your_client_id
    APALEO_CLIENT_SECRET=your_client_secret
-   APALEO_REDIRECT_URI=http://localhost:3000/auth/callback
+   APALEO_REDIRECT_URI=http://localhost:3000/callback
    NEXTAUTH_URL=http://localhost:3000
    NEXTAUTH_SECRET=your_nextauth_secret
 
    # Public environment variables
    NEXT_PUBLIC_APALEO_CLIENT_ID=your_client_id
-   NEXT_PUBLIC_APALEO_REDIRECT_URI=http://localhost:3000/auth/callback
+   NEXT_PUBLIC_APALEO_REDIRECT_URI=http://localhost:3000/callback
    ```
 
 4. Start the development server:
@@ -68,7 +68,7 @@ This is a Next.js application that implements OAuth authentication with Apaleo f
 
 - `APALEO_CLIENT_ID`: Your Apaleo client ID
 - `APALEO_CLIENT_SECRET`: Your Apaleo client secret
-- `APALEO_REDIRECT_URI`: The callback URL for OAuth (e.g., http://localhost:3000/auth/callback)
+- `APALEO_REDIRECT_URI`: The callback URL for OAuth (e.g., http://localhost:3000/callback)
 - `NEXTAUTH_URL`: The base URL of your application
 - `NEXTAUTH_SECRET`: A random string used to hash tokens and sign cookies
 - `NEXT_PUBLIC_APALEO_CLIENT_ID`: Same as APALEO_CLIENT_ID (for client-side use)
