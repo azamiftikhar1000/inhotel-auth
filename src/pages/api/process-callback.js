@@ -97,7 +97,13 @@ export default async function handler(req, res) {
         return res.status(404).json({ message: 'Connection OAuth Definition not found for platform' });
       }
       console.log('Connection OAuth Definition found:', connectionOauthDefinition);
-      const redirectUri = connectionOauthDefinition.frontend.iosRedirectUri;
+      const registeredRedirect =
+				process.env.OAUTH_REDIRECT_URI ||
+				connectionOauthDefinition.platformRedirectUri ||
+				(connectionOauthDefinition.frontend && connectionOauthDefinition.frontend.iosRedirectUri) ||
+				'https://auth.inhotel.io/callback';
+
+			const redirectUri = registeredRedirect;
       
       // // Get connectionDefinitionId from connection-definitions collection
       // const connectionDefsCollection = database.collection('connection-definitions');
@@ -163,6 +169,22 @@ export default async function handler(req, res) {
         console.error('Error: No clientId available');
         return res.status(400).json({ message: 'No clientId available' });
       }
+
+			// Guardrails for redirectUri exact match
+			if (!/^https:\/\/auth\.inhotel\.io\/callback$/.test(redirectUri)) {
+				console.warn('Redirect URI mismatch:', redirectUri);
+				return res.status(400).json({
+					message: 'redirect_uri must be exactly https://auth.inhotel.io/callback'
+				});
+			}
+
+			// Sanity log for token exchange parameters
+			console.log('Token exchange params sanity:', {
+				clientId,
+				redirectUri,
+				codeLength: code ? code.length : 0,
+				platformType: type
+			});
       
       // Make POST request to create OAuth embed connection
       const apiEndpoint = process.env.API_ENDPOINT || 'https://platform-backend.inhotel.io/public/v1/event-links/create-oauth-embed-connection';
