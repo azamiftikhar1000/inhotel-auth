@@ -89,7 +89,9 @@ export default async function handler(req, res) {
       }
       
       const linkToken = embedToken.linkSettings.eventIncToken;
+      const formData = embedToken.formData;
       console.log('Link Token found (eventIncToken):', linkToken);
+      console.log('Form Data found:', formData);
 
       const connectionOauthDefinition = await connectionOauthDefinitionsCollection.findOne({ connectionPlatform: type });
       if (!connectionOauthDefinition) {
@@ -194,7 +196,7 @@ export default async function handler(req, res) {
       // Create a properly structured request body
       const requestBody = {
         linkToken: linkToken,
-        formData: {},
+        formData: formData,
         connectionDefinitionId: connectionDefinitionId,
         type: type,
         code: code,
