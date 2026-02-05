@@ -173,7 +173,7 @@ export default async function handler(req, res) {
       }
 
       // Guardrails for redirectUri exact match
-      if (!/^https:\/\/auth\.inhotel\.io\/callback$/.test(redirectUri)) {
+      if (!/^https:\/\/toolauth\.inhotel\.io\/callback$/.test(redirectUri)) {
         console.warn('Redirect URI mismatch:', redirectUri);
         return res.status(400).json({
           message: 'redirect_uri must be exactly https://toolauth.inhotel.io/callback'
